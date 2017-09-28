@@ -8,18 +8,16 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.scalatest.{Matchers, BeforeAndAfterEach, FlatSpec}
 
-
 /**
   * Tests for Timeserie generator
-  * Copyright (C) 2017  Project-EBDO
   * Author: Joseph Allemandou
   */
 class TestTimeserieGenerator
-  extends FlatSpec
-  with Matchers
-  with SharedSparkContext
-  with BeforeAndAfterEach
-  with RDDComparisons {
+    extends FlatSpec
+    with Matchers
+    with SharedSparkContext
+    with BeforeAndAfterEach
+    with RDDComparisons {
 
   // Global variable to clean execution context for every test
   var timeserieGenerator = null.asInstanceOf[TimeserieGenerator]

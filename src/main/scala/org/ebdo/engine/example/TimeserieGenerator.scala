@@ -1,3 +1,19 @@
+/** Copyright (C) 2017 Project-EBDO
+  *
+  * This program is free software: you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation, either version 3 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+
 package org.ebdo.engine.example
 
 import java.sql.Timestamp
@@ -9,7 +25,6 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
   * Timeserie generator in Spark
-  * Copyright (C) 2017 Project-EBDO
   * Author: Joseph Allemandou
   *
   * Generates a dataframe containing a value for every
@@ -38,6 +53,12 @@ class TimeserieGenerator(spark: SparkSession) extends Serializable {
 
 
   /**
+    * Private identity function to use as default valueBuilder
+    */
+  private def identity(idx: Int) = idx.toDouble
+
+
+  /**
     * Function generating a timeserie dataframe.
     *
     * Uses spark partitions as follow:
@@ -45,7 +66,8 @@ class TimeserieGenerator(spark: SparkSession) extends Serializable {
     * p1: [from ... from + (interval / ticks) - 1)[
     * p2: [from + (interval / ticks) ... from + (interval / ticks) * 2 - 1[
     *  ...
-    * pN: [from + (interval / ticks) * (N -1) ... from + (interval / ticks) * N - 1 + interval % ticks [
+    * pN: [from + (interval / ticks) * (N -1)
+    *            ... from + (interval / ticks) * N - 1 + interval % ticks [
     *
     * @param from Beginning of timeserie interval generation (inclusive)
     * @param to end of timeserie interval generation (exclusive)
@@ -60,22 +82,24 @@ class TimeserieGenerator(spark: SparkSession) extends Serializable {
     *                  Default to val
     * @return The dataframe[ts, val] of values generated for the time interval at tick frequency
     */
-  def makeTimeserie(from: LocalDateTime,
-                    to: LocalDateTime,
-                    tick: Duration,
-                    valueBuilder: Int => Double = (idx: Int) => idx.toDouble,
-                    numPartitions: Int = 1,
-                    tsName: String = "ts",
-                    valueName: String = "val"
-                   ): DataFrame ={
+  def makeTimeserie(
+    from: LocalDateTime,
+    to: LocalDateTime,
+    tick: Duration,
+    valueBuilder: Int => Double = identity,
+    numPartitions: Int = 1,
+    tsName: String = "ts",
+    valueName: String = "val"
+  ): DataFrame = {
 
     // Needed to easily convert the RDD to a dataframe
     import spark.implicits._
 
     // Check that tick is smaller than interval duration
     val intervalDuration = Duration.between(from, to)
-    if (intervalDuration.minus(tick).isNegative)
+    if (intervalDuration.minus(tick).isNegative) {
       throw new IllegalArgumentException("Tick should be smaller or equal than [from, to[ interval")
+    }
 
     // Precompute tick-based values
     val ticksNumber = intervalDuration.getSeconds / tick.getSeconds
@@ -88,7 +112,13 @@ class TimeserieGenerator(spark: SparkSession) extends Serializable {
     spark.sparkContext.parallelize(Seq[Int](), numPartitions)
       .mapPartitionsWithIndex { case (partitionIndex, _) =>
         // If current partition is last, pick remaining ticks in addition to regular ones
-        val ticksToGenerate: Int = if (partitionIndex < (numPartitions - 1)) ticksPerPartition else ticksPerPartition  + ticksLeftover
+        val ticksToGenerate: Int = {
+          if (partitionIndex < (numPartitions - 1)) {
+            ticksPerPartition
+          } else {
+            ticksPerPartition  + ticksLeftover
+          }
+        }
         val partitionOffsetSeconds = regularPartitionDurationSeconds * partitionIndex
         (0 to ticksToGenerate - 1).map{ t =>
           val timestamp = dt2ts(from.plus(partitionOffsetSeconds + t, ChronoUnit.SECONDS))
