@@ -28,3 +28,4 @@ test
 
 First run of sbt might be long as it will download all needed dependencies.
 
+test
